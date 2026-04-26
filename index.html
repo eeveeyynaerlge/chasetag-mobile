@@ -25,7 +25,32 @@
             overflow: hidden;
         }
 
-        /* Top Section */
+        /* Setup Overlay */
+        #setup-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .input-group { margin-bottom: 20px; width: 100%; max-width: 300px; }
+        .input-group label { display: block; margin-bottom: 8px; color: var(--primary); font-weight: bold; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            font-size: 1rem;
+        }
+
+        /* Header */
         .header {
             padding: 15px;
             display: grid;
@@ -36,15 +61,15 @@
         }
 
         .team { text-align: center; }
-        .team h2 { margin: 0; font-size: 1.2rem; color: var(--primary); }
+        .team h2 { margin: 0; font-size: 1.1rem; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px; }
         .score { font-size: 2rem; font-weight: bold; margin: 5px 0; }
-        .role { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); }
+        .role { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); font-weight: bold; }
 
-        .center-ctrl { text-align: center; }
-        #timer { font-family: monospace; font-size: 2.5rem; font-weight: bold; min-width: 100px; }
-        #reset-btn { background: none; border: 1px solid #444; color: #888; padding: 5px 10px; border-radius: 4px; margin-top: 5px; }
+        .center-ctrl { text-align: center; padding: 0 10px; }
+        #timer { font-family: monospace; font-size: 2.8rem; font-weight: bold; min-width: 110px; }
+        #reset-btn { background: none; border: 1px solid #444; color: #888; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
 
-        /* Middle Section */
+        /* Status Area */
         .status-area {
             flex-grow: 1;
             display: flex;
@@ -54,59 +79,67 @@
             text-align: center;
         }
 
-        .round-info { font-size: 1.5rem; margin-bottom: 10px; opacity: 0.8; }
-        #instruction { font-size: 1.1rem; color: var(--accent); margin: 20px; }
+        .round-info { font-size: 1.4rem; margin-bottom: 10px; opacity: 0.8; }
+        #instruction { font-size: 1.1rem; color: var(--accent); margin: 20px; max-width: 85%; line-height: 1.4; }
 
-        /* Bottom Controls */
+        /* Controls */
         .controls {
             padding: 20px;
             display: grid;
             grid-template-columns: 1fr;
-            gap: 15px;
+            gap: 12px;
             background: var(--card);
         }
 
         button {
-            padding: 20px;
-            font-size: 1.2rem;
+            padding: 18px;
+            font-size: 1.1rem;
             font-weight: bold;
             border: none;
             border-radius: 12px;
             color: white;
+            cursor: pointer;
             transition: transform 0.1s;
         }
 
         button:active { transform: scale(0.96); }
-
         #start-btn { background-color: #3700b3; }
         #tag-btn { background-color: var(--danger); }
         #evade-btn { background-color: #037d71; }
-        #random-btn { background-color: var(--primary); color: black; }
+        #random-btn, #save-names-btn { background-color: var(--primary); color: black; }
 
         .hidden { display: none !important; }
         .sudden-death { color: var(--danger) !important; animation: blink 1s infinite; }
-
-        @keyframes blink { 
-            50% { opacity: 0.5; }
-        }
+        @keyframes blink { 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
 
+    <div id="setup-overlay">
+        <h1 style="color: var(--primary)">Chase Tag Setup</h1>
+        <div class="input-group">
+            <label>Team 1 Name</label>
+            <input type="text" id="in-t1" placeholder="e.g. Red Dragons" value="Team A">
+        </div>
+        <div class="input-group">
+            <label>Team 2 Name</label>
+            <input type="text" id="in-t2" placeholder="e.g. Blue Wolves" value="Team B">
+        </div>
+        <button id="save-names-btn" style="width: 100%; max-width: 300px;">Start Match</button>
+    </div>
+
     <div class="header">
         <div class="team">
-            <h2 id="t1-name">Team A</h2>
+            <h2 id="t1-display-name">Team A</h2>
             <div class="score" id="t1-score">0</div>
             <div class="role" id="t1-role">-</div>
         </div>
-
         <div class="center-ctrl">
             <div id="timer">20.0</div>
-            <button id="reset-btn">RESET</button>
+            <button id="reset-btn">RESET MATCH</button>
         </div>
-
         <div class="team">
-            <h2 id="t2-name">Team B</h2>
+            <h2 id="t2-display-name">Team B</h2>
             <div class="score" id="t2-score">0</div>
             <div class="role" id="t2-role">-</div>
         </div>
@@ -119,23 +152,19 @@
     </div>
 
     <div class="controls">
-        <button id="start-btn" class="hidden">START CHASE</button>
-        <button id="tag-btn" class="hidden">TAG (Chaser Win)</button>
-        <button id="evade-btn" class="hidden">EVADE (Evader Win)</button>
+        <button id="start-btn" class="hidden">START (Space)</button>
+        <button id="tag-btn" class="hidden">TAG (T)</button>
+        <button id="evade-btn" class="hidden">EVADE (E)</button>
     </div>
 
     <script>
         let gameState = {
+            t1Name: "Team A", t2Name: "Team B",
             t1Score: 0, t2Score: 0,
-            t1Role: '', t2Role: '', // 'Chaser' or 'Evader'
-            round: 1,
-            maxRounds: 16,
-            isSuddenDeath: false,
-            sdTimeRequired: 0,
-            sdStage: 1, // 1 for first runner, 2 for second
-            timeLeft: 20.0,
-            isRunning: false,
-            startTime: null
+            t1Role: '', t2Role: '',
+            round: 1, maxRounds: 16,
+            isSuddenDeath: false, sdTimeRequired: 0, sdStage: 1,
+            timeLeft: 20.0, isRunning: false, startTime: null, rolesAssigned: false
         };
 
         const timerEl = document.getElementById('timer');
@@ -145,14 +174,23 @@
         const randomBtn = document.getElementById('random-btn');
         const instr = document.getElementById('instruction');
 
-        // Initialization
-        randomBtn.onclick = () => {
+        // Setup Logic
+        document.getElementById('save-names-btn').onclick = () => {
+            gameState.t1Name = document.getElementById('in-t1').value || "Team A";
+            gameState.t2Name = document.getElementById('in-t2').value || "Team B";
+            document.getElementById('t1-display-name').innerText = gameState.t1Name;
+            document.getElementById('t2-display-name').innerText = gameState.t2Name;
+            document.getElementById('setup-overlay').classList.add('hidden');
+        };
+
+        function assignRandom() {
             const isT1Chaser = Math.random() > 0.5;
             assignRoles(isT1Chaser);
+            gameState.rolesAssigned = true;
             randomBtn.classList.add('hidden');
             startBtn.classList.remove('hidden');
-            instr.innerText = "Ready to start!";
-        };
+            instr.innerText = "Roles set. Press Start!";
+        }
 
         function assignRoles(isT1Chaser) {
             gameState.t1Role = isT1Chaser ? 'Chaser' : 'Evader';
@@ -165,7 +203,6 @@
             document.getElementById('t2-score').innerText = gameState.t2Score;
             document.getElementById('t1-role').innerText = gameState.t1Role;
             document.getElementById('t2-role').innerText = gameState.t2Role;
-            
             if(gameState.isSuddenDeath) {
                 document.getElementById('round-display').innerText = "SUDDEN DEATH";
                 document.getElementById('round-display').classList.add('sudden-death');
@@ -174,109 +211,99 @@
             }
         }
 
-        // Timer Logic
-        function tick() {
-            if (!gameState.isRunning) return;
-            const now = performance.now();
-            const elapsed = (now - gameState.startTime) / 1000;
-            gameState.timeLeft = Math.max(0, (gameState.isSuddenDeath && gameState.sdStage === 2 ? gameState.sdTimeRequired : 20.0) - elapsed);
-            
-            timerEl.innerText = gameState.timeLeft.toFixed(1);
-
-            if (gameState.timeLeft <= 0) {
-                endChase('evade');
-            } else {
-                requestAnimationFrame(tick);
-            }
-        }
-
-        startBtn.onclick = () => {
+        function startChase() {
+            if (!gameState.rolesAssigned || gameState.isRunning) return;
             gameState.isRunning = true;
             gameState.startTime = performance.now();
             startBtn.classList.add('hidden');
             tagBtn.classList.remove('hidden');
             evadeBtn.classList.remove('hidden');
             requestAnimationFrame(tick);
-        };
+        }
+
+        function tick() {
+            if (!gameState.isRunning) return;
+            const now = performance.now();
+            const elapsed = (now - gameState.startTime) / 1000;
+            const limit = (gameState.isSuddenDeath && gameState.sdStage === 2) ? gameState.sdTimeRequired : 20.0;
+            gameState.timeLeft = Math.max(0, limit - elapsed);
+            timerEl.innerText = gameState.timeLeft.toFixed(1);
+            if (gameState.timeLeft <= 0) endChase('evade');
+            else requestAnimationFrame(tick);
+        }
 
         function endChase(result) {
+            if (!gameState.isRunning) return;
             gameState.isRunning = false;
-            tagBtn.classList.add('hidden');
-            evadeBtn.classList.remove('hidden'); // Show evade only to reset or handle UI
-
-            if (gameState.isSuddenDeath) {
-                handleSuddenDeathLogic(result);
-            } else {
-                handleStandardLogic(result);
-            }
+            if (gameState.isSuddenDeath) handleSuddenDeathLogic(result);
+            else handleStandardLogic(result);
         }
 
         function handleStandardLogic(result) {
-            // Scoring: only on successful evasion
             if (result === 'evade') {
                 if (gameState.t1Role === 'Evader') gameState.t1Score++;
                 else gameState.t2Score++;
                 instr.innerText = "Point Scored! Keep Roles.";
             } else {
-                // Change roles on tag
-                const wasT1Chaser = gameState.t1Role === 'Chaser';
-                assignRoles(!wasT1Chaser);
+                assignRoles(gameState.t1Role !== 'Chaser');
                 instr.innerText = "Tagged! Roles Swapped.";
             }
-
             gameState.round++;
-            if (gameState.round > gameState.maxRounds) {
-                checkWinner();
-            } else {
-                resetTimer();
-            }
+            if (gameState.round > gameState.maxRounds) checkWinner();
+            else resetTimer();
         }
 
         function handleSuddenDeathLogic(result) {
             if (gameState.sdStage === 1) {
-                let time = prompt("Sudden Death Stage 1: How many seconds did the evader last? (e.g. 12.4)");
+                let currentEvader = gameState.t1Role === 'Evader' ? gameState.t1Name : gameState.t2Name;
+                let time = prompt(`${currentEvader} evaded for how long? (e.g. 14.5)`);
                 gameState.sdTimeRequired = parseFloat(time) || 0;
                 gameState.sdStage = 2;
-                const wasT1Chaser = gameState.t1Role === 'Chaser';
-                assignRoles(!wasT1Chaser);
-                instr.innerText = `Target: Evade for more than ${gameState.sdTimeRequired}s`;
+                assignRoles(gameState.t1Role !== 'Chaser');
+                instr.innerText = `Target: Survive > ${gameState.sdTimeRequired}s`;
                 resetTimer(gameState.sdTimeRequired);
             } else {
-                // Result of the second chase
-                if (result === 'evade') {
-                    instr.innerText = "Challenger Wins Sudden Death!";
-                } else {
-                    instr.innerText = "Defender Wins Sudden Death!";
-                }
-                startBtn.classList.add('hidden');
-                evadeBtn.classList.add('hidden');
+                const winner = (result === 'evade') ? 
+                    (gameState.t1Role === 'Evader' ? gameState.t1Name : gameState.t2Name) : 
+                    (gameState.t1Role === 'Chaser' ? gameState.t1Name : gameState.t2Name);
+                instr.innerText = `${winner} wins Sudden Death!`;
+                tagBtn.classList.add('hidden'); evadeBtn.classList.add('hidden');
             }
         }
 
         function checkWinner() {
             if (gameState.t1Score === gameState.t2Score) {
                 gameState.isSuddenDeath = true;
-                instr.innerText = "DRAW! Sudden Death: First to set a time.";
+                instr.innerText = "Draw! Entering Sudden Death.";
                 resetTimer();
             } else {
-                const winner = gameState.t1Score > gameState.t2Score ? "Team A" : "Team B";
-                instr.innerText = `${winner} WINS!`;
-                startBtn.classList.add('hidden');
+                const winner = gameState.t1Score > gameState.t2Score ? gameState.t1Name : gameState.t2Name;
+                instr.innerText = `${winner.toUpperCase()} WINS!`;
+                startBtn.classList.add('hidden'); tagBtn.classList.add('hidden'); evadeBtn.classList.add('hidden');
             }
         }
 
         function resetTimer(customTime = 20.0) {
             gameState.timeLeft = customTime;
             timerEl.innerText = customTime.toFixed(1);
-            startBtn.classList.remove('hidden');
-            tagBtn.classList.add('hidden');
-            evadeBtn.classList.add('hidden');
+            startBtn.classList.remove('hidden'); tagBtn.classList.add('hidden'); evadeBtn.classList.add('hidden');
             updateUI();
         }
 
+        randomBtn.onclick = assignRandom;
+        startBtn.onclick = startChase;
         tagBtn.onclick = () => endChase('tag');
         evadeBtn.onclick = () => endChase('evade');
         document.getElementById('reset-btn').onclick = () => location.reload();
+
+        window.addEventListener('keydown', (e) => {
+            if (document.getElementById('setup-overlay').classList.contains('hidden')) {
+                const key = e.key.toLowerCase();
+                if (key === ' ') { e.preventDefault(); if (!gameState.rolesAssigned) assignRandom(); else if (!gameState.isRunning) startChase(); }
+                if (key === 't' && gameState.isRunning) endChase('tag');
+                if (key === 'e' && gameState.isRunning) endChase('evade');
+            }
+        });
     </script>
 </body>
 </html>
