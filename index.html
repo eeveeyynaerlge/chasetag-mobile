@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Chase Tag Scorer</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --card: #1e1e1e;
+            --primary: #bb86fc;
+            --accent: #03dac6;
+            --danger: #cf6679;
+            --text: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Top Section */
+        .header {
+            padding: 15px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            background: var(--card);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .team { text-align: center; }
+        .team h2 { margin: 0; font-size: 1.2rem; color: var(--primary); }
+        .score { font-size: 2rem; font-weight: bold; margin: 5px 0; }
+        .role { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); }
+
+        .center-ctrl { text-align: center; }
+        #timer { font-family: monospace; font-size: 2.5rem; font-weight: bold; min-width: 100px; }
+        #reset-btn { background: none; border: 1px solid #444; color: #888; padding: 5px 10px; border-radius: 4px; margin-top: 5px; }
+
+        /* Middle Section */
+        .status-area {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .round-info { font-size: 1.5rem; margin-bottom: 10px; opacity: 0.8; }
+        #instruction { font-size: 1.1rem; color: var(--accent); margin: 20px; }
+
+        /* Bottom Controls */
+        .controls {
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            background: var(--card);
+        }
+
+        button {
+            padding: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            transition: transform 0.1s;
+        }
+
+        button:active { transform: scale(0.96); }
+
+        #start-btn { background-color: #3700b3; }
+        #tag-btn { background-color: var(--danger); }
+        #evade-btn { background-color: #037d71; }
+        #random-btn { background-color: var(--primary); color: black; }
+
+        .hidden { display: none !important; }
+        .sudden-death { color: var(--danger) !important; animation: blink 1s infinite; }
+
+        @keyframes blink { 
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="team">
+            <h2 id="t1-name">Team A</h2>
+            <div class="score" id="t1-score">0</div>
+            <div class="role" id="t1-role">-</div>
+        </div>
+
+        <div class="center-ctrl">
+            <div id="timer">20.0</div>
+            <button id="reset-btn">RESET</button>
+        </div>
+
+        <div class="team">
+            <h2 id="t2-name">Team B</h2>
+            <div class="score" id="t2-score">0</div>
+            <div class="role" id="t2-role">-</div>
+        </div>
+    </div>
+
+    <div class="status-area">
+        <div class="round-info" id="round-display">Round 1/16</div>
+        <div id="instruction">Assign roles to begin</div>
+        <button id="random-btn">Assign Random Roles</button>
+    </div>
+
+    <div class="controls">
+        <button id="start-btn" class="hidden">START CHASE</button>
+        <button id="tag-btn" class="hidden">TAG (Chaser Win)</button>
+        <button id="evade-btn" class="hidden">EVADE (Evader Win)</button>
+    </div>
+
+    <script>
+        let gameState = {
+            t1Score: 0, t2Score: 0,
+            t1Role: '', t2Role: '', // 'Chaser' or 'Evader'
+            round: 1,
+            maxRounds: 16,
+            isSuddenDeath: false,
+            sdTimeRequired: 0,
+            sdStage: 1, // 1 for first runner, 2 for second
+            timeLeft: 20.0,
+            isRunning: false,
+            startTime: null
+        };
+
+        const timerEl = document.getElementById('timer');
+        const startBtn = document.getElementById('start-btn');
+        const tagBtn = document.getElementById('tag-btn');
+        const evadeBtn = document.getElementById('evade-btn');
+        const randomBtn = document.getElementById('random-btn');
+        const instr = document.getElementById('instruction');
+
+        // Initialization
+        randomBtn.onclick = () => {
+            const isT1Chaser = Math.random() > 0.5;
+            assignRoles(isT1Chaser);
+            randomBtn.classList.add('hidden');
+            startBtn.classList.remove('hidden');
+            instr.innerText = "Ready to start!";
+        };
+
+        function assignRoles(isT1Chaser) {
+            gameState.t1Role = isT1Chaser ? 'Chaser' : 'Evader';
+            gameState.t2Role = isT1Chaser ? 'Evader' : 'Chaser';
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('t1-score').innerText = gameState.t1Score;
+            document.getElementById('t2-score').innerText = gameState.t2Score;
+            document.getElementById('t1-role').innerText = gameState.t1Role;
+            document.getElementById('t2-role').innerText = gameState.t2Role;
+            
+            if(gameState.isSuddenDeath) {
+                document.getElementById('round-display').innerText = "SUDDEN DEATH";
+                document.getElementById('round-display').classList.add('sudden-death');
+            } else {
+                document.getElementById('round-display').innerText = `Round ${gameState.round}/${gameState.maxRounds}`;
+            }
+        }
+
+        // Timer Logic
+        function tick() {
+            if (!gameState.isRunning) return;
+            const now = performance.now();
+            const elapsed = (now - gameState.startTime) / 1000;
+            gameState.timeLeft = Math.max(0, (gameState.isSuddenDeath && gameState.sdStage === 2 ? gameState.sdTimeRequired : 20.0) - elapsed);
+            
+            timerEl.innerText = gameState.timeLeft.toFixed(1);
+
+            if (gameState.timeLeft <= 0) {
+                endChase('evade');
+            } else {
+                requestAnimationFrame(tick);
+            }
+        }
+
+        startBtn.onclick = () => {
+            gameState.isRunning = true;
+            gameState.startTime = performance.now();
+            startBtn.classList.add('hidden');
+            tagBtn.classList.remove('hidden');
+            evadeBtn.classList.remove('hidden');
+            requestAnimationFrame(tick);
+        };
+
+        function endChase(result) {
+            gameState.isRunning = false;
+            tagBtn.classList.add('hidden');
+            evadeBtn.classList.remove('hidden'); // Show evade only to reset or handle UI
+
+            if (gameState.isSuddenDeath) {
+                handleSuddenDeathLogic(result);
+            } else {
+                handleStandardLogic(result);
+            }
+        }
+
+        function handleStandardLogic(result) {
+            // Scoring: only on successful evasion
+            if (result === 'evade') {
+                if (gameState.t1Role === 'Evader') gameState.t1Score++;
+                else gameState.t2Score++;
+                instr.innerText = "Point Scored! Keep Roles.";
+            } else {
+                // Change roles on tag
+                const wasT1Chaser = gameState.t1Role === 'Chaser';
+                assignRoles(!wasT1Chaser);
+                instr.innerText = "Tagged! Roles Swapped.";
+            }
+
+            gameState.round++;
+            if (gameState.round > gameState.maxRounds) {
+                checkWinner();
+            } else {
+                resetTimer();
+            }
+        }
+
+        function handleSuddenDeathLogic(result) {
+            if (gameState.sdStage === 1) {
+                let time = prompt("Sudden Death Stage 1: How many seconds did the evader last? (e.g. 12.4)");
+                gameState.sdTimeRequired = parseFloat(time) || 0;
+                gameState.sdStage = 2;
+                const wasT1Chaser = gameState.t1Role === 'Chaser';
+                assignRoles(!wasT1Chaser);
+                instr.innerText = `Target: Evade for more than ${gameState.sdTimeRequired}s`;
+                resetTimer(gameState.sdTimeRequired);
+            } else {
+                // Result of the second chase
+                if (result === 'evade') {
+                    instr.innerText = "Challenger Wins Sudden Death!";
+                } else {
+                    instr.innerText = "Defender Wins Sudden Death!";
+                }
+                startBtn.classList.add('hidden');
+                evadeBtn.classList.add('hidden');
+            }
+        }
+
+        function checkWinner() {
+            if (gameState.t1Score === gameState.t2Score) {
+                gameState.isSuddenDeath = true;
+                instr.innerText = "DRAW! Sudden Death: First to set a time.";
+                resetTimer();
+            } else {
+                const winner = gameState.t1Score > gameState.t2Score ? "Team A" : "Team B";
+                instr.innerText = `${winner} WINS!`;
+                startBtn.classList.add('hidden');
+            }
+        }
+
+        function resetTimer(customTime = 20.0) {
+            gameState.timeLeft = customTime;
+            timerEl.innerText = customTime.toFixed(1);
+            startBtn.classList.remove('hidden');
+            tagBtn.classList.add('hidden');
+            evadeBtn.classList.add('hidden');
+            updateUI();
+        }
+
+        tagBtn.onclick = () => endChase('tag');
+        evadeBtn.onclick = () => endChase('evade');
+        document.getElementById('reset-btn').onclick = () => location.reload();
+    </script>
+</body>
+</html>
